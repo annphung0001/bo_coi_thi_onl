@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bài kiểm tra giữa kì Tin học 9</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#172033;background:#f3f6fb}
+*{box-sizing:border-box}body{margin:0}header{background:#173b70;color:white;padding:20px 16px;text-align:center}
+header h1{font-size:clamp(1.25rem,3vw,2rem);margin:0 0 8px}header p{margin:0;opacity:.9}
+main{max-width:1100px;margin:20px auto;padding:0 14px}
+.card{background:white;border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 4px 18px #17203312}
+label{display:block;font-weight:700;margin:12px 0 6px}input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px}
+button{border:0;border-radius:9px;padding:12px 18px;font-size:16px;font-weight:700;cursor:pointer}
+.primary{background:#1769d2;color:white}.secondary{background:#e7eef8;color:#173b70}
+.row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.row>div{flex:1;min-width:220px}
+#timer{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;font-variant-numeric:tabular-nums;color:#1769d2}
+#timer.danger{color:#c62828}.status{display:inline-block;padding:5px 10px;border-radius:20px;background:#e8f5e9;color:#216e39;font-weight:700}
+.warning{background:#fff4e5;border-left:5px solid #e89518;padding:12px;border-radius:6px}
+.dangerbox{background:#ffebee;border-left:5px solid #c62828;padding:12px;border-radius:6px}
+#examArea{display:none}#formFrame{width:100%;height:78vh;min-height:600px;border:0}
+.small{font-size:.9rem;color:#526078;line-height:1.5}.hidden{display:none!important}
+#eventList{max-height:150px;overflow:auto;font-size:.9rem;padding-left:20px}
+footer{text-align:center;color:#65718a;padding:20px;font-size:.85rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>BÀI KIỂM TRA GIỮA KÌ TIN HỌC 9</h1>
+  <p>Hệ thống hỗ trợ giám sát trong thời gian làm bài</p>
+</header>
+<main>
+  <section class="card" id="identityCard">
+    <h2>Thông tin học sinh</h2>
+    <p class="small">Em hãy nhập chính xác họ tên và lớp. Đồng hồ bắt đầu khi nhấn “Bắt đầu làm bài”.</p>
+    <form id="identityForm">
+      <label for="studentName">Họ và tên</label>
+      <input id="studentName" name="studentName" autocomplete="name" required maxlength="100" placeholder="Ví dụ: Nguyễn Văn An">
+      <label for="studentClass">Lớp</label>
+      <input id="studentClass" name="studentClass" required maxlength="30" placeholder="Ví dụ: 9A1">
+      <p class="warning">Trong khi làm bài, không chuyển tab/cửa sổ hoặc rời khỏi màn hình thi. Trình duyệt chỉ ghi nhận được một số dấu hiệu như chuyển tab, cửa sổ mất tiêu điểm hoặc thoát toàn màn hình; không thể phát hiện chắc chắn mọi ứng dụng khác đang mở.</p>
+      <button class="primary" type="submit">Bắt đầu làm bài</button>
+    </form>
+  </section>
+
+  <section id="examArea">
+    <section class="card">
+      <div class="row">
+        <div><div class="small">Thời gian còn lại</div><div id="timer">45:00</div></div>
+        <div><div class="small">Học sinh</div><strong id="studentSummary"></strong><p><span class="status" id="connectionStatus">Đang ghi nhận sự kiện</span></p></div>
+        <div><div class="small">Số lần vi phạm được ghi nhận</div><div id="violationCount" style="font-size:2rem;font-weight:800">0</div></div>
+      </div>
+      <p class="small">Mỗi cảnh báo được ghi vào nhật ký. Giáo viên cần xem xét ngữ cảnh; các sự kiện trình duyệt không tự chứng minh học sinh gian lận.</p>
+      <div id="liveWarning" class="dangerbox hidden" role="alert"></div>
+    </section>
+    <section class="card">
+      <h2>Đề kiểm tra</h2>
+      <p class="small">Không đóng trang này trong khi làm bài. Bài thi được mở bên dưới.</p>
+      <iframe id="formFrame" title="Google Form bài kiểm tra" loading="eager" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </section>
+    <section class="card">
+      <h3>Nhật ký trên thiết bị này</h3>
+      <ul id="eventList"><li>Chưa có vi phạm được ghi nhận.</li></ul>
+      <button class="secondary" id="finishBtn" type="button">Nộp bài / kết thúc phiên</button>
+    </section>
+  </section>
+  <section class="card hidden" id="finishedCard">
+    <h2>Phiên làm bài đã kết thúc</h2>
+    <p>Đồng hồ đã dừng trên trang giám sát. Nếu Google Form chưa được gửi, hãy thực hiện theo hướng dẫn của giáo viên.</p>
+  </section>
+  <footer>Trang hỗ trợ giám sát, không thay thế việc coi thi trực tiếp.</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const EXAM_TITLE = 'Bài kiểm tra giữa kì Tin học 9';
+  const DURATION_SECONDS = 45 * 60;
+  const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfFYFFxlv3GzKVOHpSt_KW_V8xNhz3Ih1IIwNlNSSOdlGtfWg/viewform?embedded=true';
+  // Thay bằng URL Web App Apps Script của thầy/cô.
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxUvH2anEsQnvsPcyYll87lh_-dN06AU2dTJkSsUPc3D3EP5DuhLMfIrIG-4ierarg/exec';
+
+  const $ = id => document.getElementById(id);
+  let student = {name:'', className:''};
+  let violations = 0, secondsLeft = DURATION_SECONDS, timerId = null;
+  let started = false, ended = false, lastEventAt = 0, eventLog = [];
+
+  function sendRecord(eventType, details) {
+    const record = {
+      timestamp: new Date().toISOString(),
+      examTitle: EXAM_TITLE,
+      studentName: student.name,
+      studentClass: student.className,
+      eventType,
+      details: details || '',
+      violationCount: violations,
+      secondsLeft,
+      userAgent: navigator.userAgent
+    };
+    // URLSearchParams + no-cors giúp gửi POST đơn giản đến Apps Script.
+    // Trình duyệt không cho đọc phản hồi ở chế độ no-cors; không đồng nghĩa chắc chắn đã lưu thành công.
+    try {
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+        body: new URLSearchParams(record),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  function addEvent(type, details, isViolation = false) {
+    if (!started || ended) return;
+    const now = Date.now();
+    // Chống ghi lặp quá nhanh cùng một sự kiện do nhiều trình duyệt phát ra.
+    if (isViolation && now - lastEventAt < 1200) return;
+    if (isViolation) {
+      lastEventAt = now;
+      violations++;
+      $('violationCount').textContent = String(violations);
+      $('liveWarning').textContent = `Cảnh báo ${violations}: ${details}`;
+      $('liveWarning').classList.remove('hidden');
+      setTimeout(() => $('liveWarning').classList.add('hidden'), 6000);
+    }
+    const time = new Date().toLocaleTimeString('vi-VN');
+    eventLog.unshift(`${time} — ${type}${details ? ': ' + details : ''}`);
+    $('eventList').innerHTML = '';
+    eventLog.slice(0, 30).forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      $('eventList').appendChild(li);
+    });
+    sendRecord(type, details);
+  }
+
+  function renderTimer() {
+    const m = Math.floor(secondsLeft / 60).toString().padStart(2,'0');
+    const s = (secondsLeft % 60).toString().padStart(2,'0');
+    $('timer').textContent = `${m}:${s}`;
+    $('timer').classList.toggle('danger', secondsLeft <= 300);
+  }
+
+  function finish(reason) {
+    if (ended) return;
+    ended = true;
+    clearInterval(timerId);
+    sendRecord('SESSION_ENDED', reason);
+    $('examArea').style.display = 'none';
+    $('finishedCard').classList.remove('hidden');
+  }
+
+  $('identityForm').addEventListener('submit', e => {
+    e.preventDefault();
+    if (started) return;
+    student.name = $('studentName').value.trim();
+    student.className = $('studentClass').value.trim();
+    if (!student.name || !student.className) return;
+    started = true;
+    $('identityCard').classList.add('hidden');
+    $('examArea').style.display = 'block';
+    $('studentSummary').textContent = `${student.name} — ${student.className}`;
+    $('formFrame').src = FORM_URL;
+    sendRecord('SESSION_STARTED', 'Học sinh bắt đầu phiên làm bài');
+    renderTimer();
+    timerId = setInterval(() => {
+      if (ended) return;
+      secondsLeft--;
+      renderTimer();
+      if (secondsLeft <= 0) {
+        addEvent('TIME_EXPIRED', 'Đã hết 45 phút', false);
+        finish('Hết giờ');
+      }
+    }, 1000);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) addEvent('TAB_HIDDEN', 'Rời khỏi tab thi hoặc chuyển sang ứng dụng/cửa sổ khác', true);
+    else if (started && !ended) addEvent('TAB_VISIBLE', 'Quay lại tab thi', false);
+  });
+
+  window.addEventListener('blur', () => {
+    // Có thể kích hoạt nhầm khi thông báo hệ thống hoặc cửa sổ khác xuất hiện.
+    addEvent('WINDOW_BLUR', 'Cửa sổ trình duyệt mất tiêu điểm', true);
+  });
+  window.addEventListener('focus', () => {
+    if (started && !ended) addEvent('WINDOW_FOCUS', 'Cửa sổ trình duyệt lấy lại tiêu điểm', false);
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    if (started && !ended && !document.fullscreenElement)
+      addEvent('FULLSCREEN_EXIT', 'Thoát chế độ toàn màn hình', true);
+  });
+
+  document.addEventListener('copy', e => {
+    if (started && !ended) {
+      e.preventDefault();
+      addEvent('COPY_ATTEMPT', 'Phát hiện thao tác sao chép trên trang giám sát', true);
+    }
+  });
+  document.addEventListener('cut', e => {
+    if (started && !ended) {
+      e.preventDefault();
+      addEvent('CUT_ATTEMPT', 'Phát hiện thao tác cắt trên trang giám sát', true);
+    }
+  });
+
+  $('finishBtn').addEventListener('click', () => {
+    if (confirm('Kết thúc phiên giám sát trên trang này? Hãy chắc chắn em đã gửi Google Form.')) finish('Học sinh/giáo viên kết thúc phiên thủ công');
+  });
+
+  // Cố gắng xin toàn màn hình sau thao tác người dùng; có thể bị trình duyệt từ chối.
+  // Không bắt buộc toàn màn hình vì Google Form được nhúng trong iframe.
+  $('identityForm').addEventListener('submit', () => {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, {once:true});
+})();
+</script>
+</body>
+</html>
